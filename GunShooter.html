@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balloon Shooter Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            text-align: center;
+        }
+        canvas {
+            display: block;
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: bold;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <div id="gameOver">Game Over! Your Score: <span id="finalScore">0</span> <br> Press 'R' to Restart</div>
+    <canvas id="gameCanvas"></canvas>
+    <audio id="burstSound" src="https://www.fesliyanstudios.com/play-mp3/4380"></audio>
+    <audio id="happyTune" src="https://cdn.pixabay.com/audio/2022/03/10/audio_4b31a360-fb77-4b80-b9ea-49e0c5e6f0c5.mp3"></audio>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const gun = {
+            x: canvas.width / 2 - 30,
+            y: canvas.height - 100,
+            width: 60,
+            height: 80,
+            speed: 7,
+            dx: 0
+        };
+
+        const bullets = [];
+        const balloons = [];
+        const particles = [];
+        const kidsChain = [];
+        const colors = ["#FF0000", "#00FF00", "#0000FF", "#FF1493", "#FFD700", "#FF4500", "#9400D3"];
+        let balloonsShot = 0;
+        let missedBalloons = 0;
+        let score = 0;
+        let balloonSpeedMultiplier = 0.5;
+        const keys = {};
+        let gameOver = false;
+        let lastShot = 0;
+        const shotCooldown = 200;
+        let lastMilestone = 0;
+
+        const happyTune = document.getElementById("happyTune");
+        happyTune.volume = 0.5;
+
+        function updateScore() {
+            document.getElementById("score").textContent = "Score: " + score;
+            checkMilestone();
+        }
+
+        function checkMilestone() {
+            const currentMilestone = Math.floor(score / 100) * 100;
+            if (currentMilestone > lastMilestone && currentMilestone > 0) {
+                lastMilestone = currentMilestone;
+                playHappyTune();
+                spawnKidsChain();
+            }
+        }
+
+        function playHappyTune() {
+            happyTune.currentTime = 0;
+            happyTune.play().catch(error => console.error("Error playing happy tune:", error));
+        }
+
+        function spawnKidsChain() {
+            kidsChain.length = 0;
+            const numKids = Math.min(10, Math.floor(canvas.width / 60));
+            for (let i = 0; i < numKids; i++) {
+                kidsChain.push({
+                    x: i * 60 + 30,
+                    y: 50,
+                    life: 120
+                });
+            }
+        }
+
+        function drawKidsChain() {
+            kidsChain.forEach((kid, index) => {
+                ctx.fillStyle = "#FFD700";
+                ctx.beginPath();
+                ctx.arc(kid.x, kid.y, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "black";
+                ctx.beginPath();
+                ctx.arc(kid.x - 8, kid.y - 5, 3, 0, Math.PI * 2);
+                ctx.arc(kid.x + 8, kid.y - 5, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(kid.x, kid.y + 5, 8, 0, Math.PI);
+                ctx.stroke();
+
+                kid.life--;
+                if (kid.life <= 0) kidsChain.splice(index, 1);
+            });
+        }
+
+        function endGame() {
+            gameOver = true;
+            document.getElementById("gameOver").style.display = "block";
+            document.getElementById("finalScore").textContent = score;
+        }
+
+        function restartGame() {
+            balloons.length = 0;
+            bullets.length = 0;
+            particles.length = 0;
+            kidsChain.length = 0;
+            score = 0;
+            missedBalloons = 0;
+            balloonsShot = 0;
+            balloonSpeedMultiplier = 0.5;
+            gameOver = false;
+            lastMilestone = 0;
+            gun.x = canvas.width / 2 - 30;
+            document.getElementById("gameOver").style.display = "none";
+            updateScore();
+            gameLoop();
+        }
+
+        function drawGun() {
+            ctx.fillStyle = "silver";
+            ctx.beginPath();
+            ctx.moveTo(gun.x, gun.y + gun.height);
+            ctx.lineTo(gun.x + gun.width, gun.y + gun.height);
+            ctx.lineTo(gun.x + gun.width * 0.75, gun.y);
+            ctx.lineTo(gun.x + gun.width * 0.25, gun.y);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            ctx.moveTo(gun.x + gun.width * 0.35, gun.y);
+            ctx.lineTo(gun.x + gun.width * 0.65, gun.y);
+            ctx.lineTo(gun.x + gun.width * 0.75, gun.y - 30);
+            ctx.lineTo(gun.x + gun.width * 0.25, gun.y - 30);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "#00FFFF";
+            ctx.beginPath();
+            ctx.arc(gun.x + gun.width / 2, gun.y - 30, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#FF4040";
+            ctx.beginPath();
+            ctx.arc(gun.x + gun.width / 2, gun.y + gun.height, 15, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawBullets() {
+            ctx.fillStyle = "white";
+            bullets.forEach((bullet, index) => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+                bullet.y -= bullet.speed;
+                if (bullet.y < 0) bullets.splice(index, 1);
+            });
+        }
+
+        function drawBalloons() {
+            balloons.forEach((balloon, index) => {
+                ctx.fillStyle = balloon.color;
+                ctx.beginPath();
+                ctx.ellipse(balloon.x, balloon.y, balloon.radius * 0.7, balloon.radius, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = balloon.color;
+                ctx.beginPath();
+                ctx.moveTo(balloon.x - balloon.radius * 0.2, balloon.y + balloon.radius);
+                ctx.lineTo(balloon.x + balloon.radius * 0.2, balloon.y + balloon.radius);
+                ctx.lineTo(balloon.x, balloon.y + balloon.radius + balloon.radius * 0.4);
+                ctx.closePath();
+                ctx.fill();
+                balloon.y += balloon.speed * balloonSpeedMultiplier;
+                balloon.x += Math.sin(balloon.y * 0.03) * 2;
+                if (balloon.y > canvas.height) {
+                    balloons.splice(index, 1);
+                    missedBalloons++;
+                    if (missedBalloons >= 3) {
+                        endGame();
+                    }
+                }
+            });
+        }
+
+        function createParticles(x, y, balloonColor) {
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    radius: 3 + Math.random() * 3,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    life: 30
+                });
+            }
+        }
+
+        function drawParticles() {
+            particles.forEach((particle, index) => {
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                ctx.fill();
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life--;
+                particle.radius *= 0.95;
+                if (particle.life <= 0 || particle.radius < 0.5) {
+                    particles.splice(index, 1);
+                }
+            });
+        }
+
+        function detectCollision() {
+            bullets.forEach((bullet, bIndex) => {
+                balloons.forEach((balloon, balIndex) => {
+                    const dx = bullet.x - balloon.x;
+                    const dy = bullet.y - balloon.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < balloon.radius) {
+                        document.getElementById("burstSound").play();
+                        createParticles(balloon.x, balloon.y, balloon.color);
+                        balloons.splice(balIndex, 1);
+                        bullets.splice(bIndex, 1);
+                        balloonsShot++;
+                        score += 5; // Changed from score++ to score += 5
+                        updateScore();
+                        if (balloonsShot % 10 === 0) {
+                            balloonSpeedMultiplier = Math.min(balloonSpeedMultiplier + 0.2, 2.0);
+                        }
+                    }
+                });
+            });
+        }
+
+        function spawnBalloon() {
+            if (!gameOver) {
+                balloons.push({
+                    x: Math.random() * canvas.width,
+                    y: 0,
+                    radius: 25 + Math.random() * 15,
+                    speed: 0.5 + Math.random() * 0.5,
+                    color: colors[Math.floor(Math.random() * colors.length)]
+                });
+            }
+        }
+
+        function updateGunPosition() {
+            gun.dx = 0;
+            if (keys["ArrowLeft"]) gun.dx = -gun.speed;
+            if (keys["ArrowRight"]) gun.dx = gun.speed;
+            gun.x += gun.dx;
+            gun.x = Math.max(0, Math.min(canvas.width - gun.width, gun.x));
+        }
+
+        function gameLoop() {
+            if (!gameOver) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                updateGunPosition();
+                drawGun();
+                drawBullets();
+                drawBalloons();
+                drawParticles();
+                drawKidsChain();
+                detectCollision();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        document.addEventListener("keydown", (e) => {
+            keys[e.key] = true;
+            if (e.key === " " && Date.now() - lastShot > shotCooldown) {
+                bullets.push({ x: gun.x + gun.width / 2, y: gun.y - 30, radius: 5, speed: 10 });
+                lastShot = Date.now();
+            }
+            if (gameOver && e.key === "r") restartGame();
+        });
+
+        document.addEventListener("keyup", (e) => {
+            keys[e.key] = false;
+        });
+
+        setInterval(spawnBalloon, 1500);
+        gameLoop();
+    </script>
+</body>
+</html>
