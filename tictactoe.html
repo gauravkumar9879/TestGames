@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>😺🐶 Tic-Tac-Toe for Kids</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Comic+Sans+MS&display=swap');
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+      background: linear-gradient(135deg, #ffeb3b, #f06292);
+      color: #333;
+      margin: 0;
+      min-height: 100vh;
+    }
+    h1 {
+      font-size: 40px;
+      color: #d81b60;
+      text-shadow: 2px 2px #fff;
+      margin: 20px;
+    }
+    #game-container {
+      position: relative;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 120px);
+      grid-gap: 10px;
+      margin: 20px;
+      background: #81d4fa;
+      padding: 15px;
+      border-radius: 15px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+    .cell {
+      width: 120px;
+      height: 120px;
+      background: #fff;
+      border: 3px solid #0288d1;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 60px;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .cell:hover {
+      background: #b3e5fc;
+      transform: scale(1.1);
+    }
+    .cell:active {
+      transform: scale(0.95);
+    }
+    #canvas {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      pointer-events: none;
+    }
+    #status {
+      font-size: 28px;
+      color: #fff;
+      background: #d81b60;
+      padding: 10px 20px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      text-shadow: 1px 1px #333;
+      animation: pulse 2s infinite;
+    }
+    #reset {
+      padding: 15px 30px;
+      font-size: 20px;
+      cursor: pointer;
+      background: #ffca28;
+      color: #d81b60;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+      transition: background 0.2s, transform 0.2s;
+    }
+    #reset:hover {
+      background: #ffb300;
+      transform: scale(1.1);
+    }
+    #reset:active {
+      transform: scale(0.95);
+    }
+    #win-popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #ffca28;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+      text-align: center;
+      font-size: 32px;
+      color: #d81b60;
+      text-shadow: 1px 1px #fff;
+      z-index: 1000;
+    }
+    #win-popup button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 20px;
+      background: #d81b60;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #win-popup button:hover {
+      background: #b0003a;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    @keyframes winFlash {
+      0% { background: #fff; }
+      50% { background: #ff1744; }
+      100% { background: #fff; }
+    }
+    .win-cell {
+      animation: winFlash 0.3s 4;
+      border-color: #ff1744;
+    }
+  </style>
+</head>
+<body>
+  <h1>😺🐶 Tic-Tac-Toe Fun!</h1>
+  <div id="status">😺's turn to play!</div>
+  <div id="game-container">
+    <div id="board">
+      <div class="cell" data-index="0"></div>
+      <div class="cell" data-index="1"></div>
+      <div class="cell" data-index="2"></div>
+      <div class="cell" data-index="3"></div>
+      <div class="cell" data-index="4"></div>
+      <div class="cell" data-index="5"></div>
+      <div class="cell" data-index="6"></div>
+      <div class="cell" data-index="7"></div>
+      <div class="cell" data-index="8"></div>
+    </div>
+    <canvas id="canvas" width="390" height="390"></canvas>
+  </div>
+  <button id="reset">Play Again! 🎉</button>
+  <div id="win-popup">
+    <div id="win-message"></div>
+    <button onclick="closePopup()">Keep Playing! 🎈</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script>
+  <script>
+    const jsConfetti = new JSConfetti();
+    const board = ['', '', '', '', '', '', '', '', ''];
+    let currentPlayer = '😺';
+    const status = document.getElementById('status');
+    const cells = document.querySelectorAll('.cell');
+    const resetButton = document.getElementById('reset');
+    const winPopup = document.getElementById('win-popup');
+    const winMessage = document.getElementById('win-message');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const winCombinations = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+      [0, 4, 8], [2, 4, 6] // Diagonals
+    ];
+
+    const cellSize = 120;
+    const gap = 10;
+    const offset = 15;
+    const lineAnimationSpeed = 0.02;
+    let lineProgress = 0;
+    let winningCombo = null;
+    let particles = [];
+
+    // Particle system for sparkling effect
+    class Particle {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 5 + 2;
+        this.speedX = Math.random() * 4 - 2;
+        this.speedY = Math.random() * 4 - 2;
+        this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        this.life = 30;
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.size *= 0.95;
+        this.life--;
+      }
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function checkWin() {
+      for (const combo of winCombinations) {
+        if (
+          board[combo[0]] &&
+          board[combo[0]] === board[combo[1]] &&
+          board[combo[1]] === board[combo[2]]
+        ) {
+          combo.forEach(index => cells[index].classList.add('win-cell'));
+          winningCombo = combo;
+          return board[combo[0]];
+        }
+      }
+      return board.includes('') ? null : 'Draw';
+    }
+
+    function getCellCenter(index) {
+      const row = Math.floor(index / 3);
+      const col = index % 3;
+      const x = offset + col * (cellSize + gap) + cellSize / 2;
+      const y = offset + row * (cellSize + gap) + cellSize / 2;
+      return { x, y };
+    }
+
+    function createParticles() {
+      if (!winningCombo) return;
+      const start = getCellCenter(winningCombo[0]);
+      const end = getCellCenter(winningCombo[2]);
+      const steps = 10;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = start.x + t * (end.x - start.x);
+        const y = start.y + t * (end.y - start.y);
+        for (let j = 0; j < 3; j++) {
+          particles.push(new Particle(x, y));
+        }
+      }
+    }
+
+    function updateParticles() {
+      particles = particles.filter(p => p.life > 0);
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      if (particles.length > 0) {
+        requestAnimationFrame(updateParticles);
+      }
+    }
+
+    function drawWinningLine() {
+      if (!winningCombo || lineProgress >= 1) {
+        if (lineProgress >= 1) {
+          createParticles();
+          updateParticles();
+        }
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#ff0000');
+      gradient.addColorStop(0.2, '#ff9900');
+      gradient.addColorStop(0.4, '#33cc33');
+      gradient.addColorStop(0.6, '#3399ff');
+      gradient.addColorStop(0.8, '#cc33cc');
+      gradient.addColorStop(1, '#ff0000');
+      ctx.strokeStyle = gradient;
+
+      const start = getCellCenter(winningCombo[0]);
+      const end = getCellCenter(winningCombo[2]);
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const x = start.x + dx * lineProgress;
+      const y = start.y + dy * lineProgress;
+
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+
+      lineProgress += lineAnimationSpeed;
+      if (lineProgress < 1) {
+        requestAnimationFrame(drawWinningLine);
+      } else {
+        createParticles();
+        updateParticles();
+      }
+    }
+
+    function showWinPopup(winner) {
+      let soundUrl;
+      if (winner === 'Draw') {
+        winMessage.textContent = "It's a Tie! 😸🐶";
+        soundUrl = 'dog.mp3'; // Tie sound
+      } else {
+        winMessage.textContent = `${winner} Wins! 🎉`;
+        soundUrl = winner === '😺'
+          ? 'https://www.soundjay.com/buttons/sounds/button-09.mp3' // Cat win
+          : 'https://www.soundjay.com/buttons/sounds/button-21.mp3'; // Dog win
+        jsConfetti.addConfetti({
+          emojis: ['🎉', '⭐', '😺', '🐶'],
+          confettiNumber: 100,
+        });
+      }
+      const sound = new Audio(soundUrl);
+      sound.play().catch(() => {});
+      winPopup.style.display = 'block';
+    }
+
+    function closePopup() {
+      winPopup.style.display = 'none';
+      resetGame();
+    }
+
+    function handleClick(event) {
+      const index = event.target.dataset.index;
+      if (board[index] || checkWin()) return;
+
+      board[index] = currentPlayer;
+      event.target.textContent = currentPlayer;
+
+      const result = checkWin();
+      if (result) {
+        status.textContent = result === 'Draw' ? "It's a Tie! 😸🐶" : `${result} Wins! 🎉`;
+        cells.forEach(cell => cell.style.cursor = 'not-allowed');
+        if (result !== 'Draw') {
+          lineProgress = 0;
+          requestAnimationFrame(drawWinningLine);
+        }
+        showWinPopup(result);
+      } else {
+        currentPlayer = currentPlayer === '😺' ? '🐶' : '😺';
+        status.textContent = `${currentPlayer}'s turn to play!`;
+      }
+    }
+
+    function resetGame() {
+      board.fill('');
+      currentPlayer = '😺';
+      status.textContent = `${currentPlayer}'s turn to play!`;
+      cells.forEach(cell => {
+        cell.textContent = '';
+        cell.style.cursor = 'pointer';
+        cell.classList.remove('win-cell');
+      });
+      winPopup.style.display = 'none';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      lineProgress = 0;
+      winningCombo = null;
+      particles = [];
+    }
+
+    cells.forEach(cell => cell.addEventListener('click', handleClick));
+    resetButton.addEventListener('click', closePopup);
+  </script>
+</body>
+</html>
