@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Game for Kids</title>
+  <link href="https://fonts.googleapis.com/css2?family=Comic+Neue&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/confetti-js@0.0.18/dist/index.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+  <style>
+    body {
+      font-family: 'Comic Neue', cursive;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: #e0f7fa;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      color: #00796b;
+      margin-bottom: 1rem;
+    }
+
+    #game-board {
+      display: grid;
+      grid-template-columns: repeat(4, 100px);
+      grid-gap: 15px;
+    }
+
+    .card {
+      width: 100px;
+      height: 100px;
+      background-color: #ffffff;
+      border: 2px solid #00838f;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .card.matched {
+      visibility: hidden;
+    }
+
+    #level-info {
+      margin: 1rem 0;
+      font-size: 1.2rem;
+      color: #00695c;
+    }
+
+    #reward-display {
+      font-size: 1.2rem;
+      margin: 1rem 0;
+      color: #ff9800;
+    }
+
+    #confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Memory Match Adventure!</h1>
+  <div id="level-info">Level 1</div>
+  <div id="reward-display">Stars: <span id="stars">0</span></div>
+  <div id="game-board"></div>
+  <canvas id="confetti-canvas"></canvas>
+
+  <script>
+    const levels = [
+      ['🐶', '🐱', '🐶', '🐱'],
+      ['🍎', '🍌', '🍇', '🍉', '🍎', '🍌', '🍇', '🍉'],
+      ['🚗', '🚕', '🚙', '🚌', '🚗', '🚕', '🚙', '🚌'],
+      ['🐟', '🐬', '🦀', '🐳', '🐟', '🐬', '🦀', '🐳'],
+      ['🦖', '🐲', '🐉', '🦕', '🦖', '🐲', '🐉', '🦕']
+    ];
+    let currentLevel = 0;
+    let stars = 0;
+    const board = document.getElementById('game-board');
+    const levelInfo = document.getElementById('level-info');
+    const starsDisplay = document.getElementById('stars');
+    const confetti = new ConfettiGenerator({ target: 'confetti-canvas' });
+
+    const sounds = {
+      match: new Howl({ src: ['https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'] }),
+      noMatch: new Howl({ src: ['https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg'] }),
+      levelComplete: new Howl({ src: ['https://actions.google.com/sounds/v1/crowd/crowd_cheer.ogg'] }),
+    };
+
+    function shuffle(array) {
+      return array.sort(() => 0.5 - Math.random());
+    }
+
+    function renderLevel() {
+      levelInfo.textContent = `Level ${currentLevel + 1}`;
+      board.innerHTML = '';
+      let cards = shuffle([...levels[currentLevel]]);
+      cards.forEach(symbol => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.textContent = '';
+        card.dataset.symbol = symbol;
+        card.addEventListener('click', flipCard);
+        board.appendChild(card);
+      });
+    }
+
+    let flippedCards = [];
+
+    function flipCard() {
+      if (flippedCards.length === 2 || this.classList.contains('matched')) return;
+      if (flippedCards.includes(this)) return;
+
+      this.textContent = this.dataset.symbol;
+      flippedCards.push(this);
+
+      if (flippedCards.length === 2) {
+        const [card1, card2] = flippedCards;
+        if (card1.dataset.symbol === card2.dataset.symbol) {
+          card1.classList.add('matched');
+          card2.classList.add('matched');
+          sounds.match.play();
+          flippedCards = [];
+          checkWin();
+        } else {
+          sounds.noMatch.play();
+          setTimeout(() => {
+            card1.textContent = '';
+            card2.textContent = '';
+            flippedCards = [];
+          }, 1000);
+        }
+      }
+    }
+
+    function checkWin() {
+      const unmatched = [...document.querySelectorAll('.card')].filter(card => !card.classList.contains('matched'));
+      if (unmatched.length === 0) {
+        sounds.levelComplete.play();
+        stars += 3;
+        starsDisplay.textContent = stars;
+        confetti.render();
+        setTimeout(() => {
+          confetti.clear();
+          currentLevel++;
+          if (currentLevel < levels.length) {
+            renderLevel();
+          } else {
+            levelInfo.textContent = 'Congratulations! You finished all levels!';
+            board.innerHTML = '';
+          }
+        }, 3000);
+      }
+    }
+
+    renderLevel();
+  </script>
+</body>
+
+</html>
